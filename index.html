@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON工具</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      height: 100vh;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      display: flex;
+      height: 100%;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 15px 20px;
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-content {
+      flex: 1;
+      padding: 10px;
+      overflow: auto;
+    }
+
+    textarea {
+      width: 100%;
+      height: 99%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 14px;
+      resize: none;
+      outline: none;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .tree-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    .json-tree {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .json-key {
+      color: #922b21;
+      font-weight: bold;
+    }
+
+    .json-string {
+      color: #2874a6;
+    }
+
+    .json-number {
+      color: #239b56;
+    }
+
+    .json-boolean {
+      color: #af7ac5;
+    }
+
+    .json-null {
+      color: #7f8c8d;
+    }
+
+    .tree-node {
+      margin-left: 20px;
+    }
+
+    .tree-toggle {
+      cursor: pointer;
+      user-select: none;
+      margin-right: 5px;
+      display: inline-block;
+      width: 15px;
+    }
+
+    .tree-line {
+      display: flex;
+      align-items: center;
+    }
+
+    .collapsible>.tree-line>.tree-toggle {
+      transition: transform 0.2s;
+    }
+
+    .collapsible.expanded>.tree-line>.tree-toggle {
+      transform: rotate(90deg);
+    }
+
+    .hidden-children {
+      display: none;
+    }
+
+    .collapsed-bracket {
+      display: none;
+    }
+
+    .collapsible:not(.expanded) .collapsed-bracket {
+      display: inline;
+    }
+
+    .collapsible:not(.expanded) .expanded-bracket {
+      display: none;
+    }
+
+    .collapsible:not(.expanded) .tree-node {
+      display: none;
+    }
+
+    .array-index {
+      color: #7f8c8d;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      background-color: #fdf2f2;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      white-space: pre-wrap;
+    }
+
+    .empty-placeholder {
+      color: #7f8c8d;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- 左侧区域 -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>JSON 数据</span>
+        <div class="button-group">
+          <button id="compressBtn">压缩</button>
+          <button id="beautifyBtn">美化</button>
+          <button id="escapeBtn">转义</button>
+          <button id="unescapeBtn">去除转义</button>
+        </div>
+      </div>
+      <div class="panel-content">
+        <textarea id="jsonInput" placeholder='请输入JSON字符串'></textarea>
+      </div>
+    </div>
+
+    <!-- 右侧区域 -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>JSON 渲染</span>
+        <div class="button-group">
+          <button id="expandAllBtn">全部展开</button>
+          <button id="collapseAllBtn">全部收起</button>
+        </div>
+      </div>
+      <div class="panel-content">
+        <div class="tree-container">
+          <div id="jsonTree" class="json-tree"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 获取DOM元素
+    const jsonInput = document.getElementById('jsonInput');
+    const compressBtn = document.getElementById('compressBtn');
+    const beautifyBtn = document.getElementById('beautifyBtn');
+    const escapeBtn = document.getElementById('escapeBtn');
+    const unescapeBtn = document.getElementById('unescapeBtn');
+    const expandAllBtn = document.getElementById('expandAllBtn');
+    const collapseAllBtn = document.getElementById('collapseAllBtn');
+    const jsonTree = document.getElementById('jsonTree');
+
+    // 初始化时渲染一次
+    window.addEventListener('DOMContentLoaded', () => {
+      renderJsonTree();
+    });
+
+    // 监听输入变化
+    jsonInput.addEventListener('input', renderJsonTree);
+
+    // 压缩JSON
+    compressBtn.addEventListener('click', () => {
+      try {
+        const obj = JSON.parse(jsonInput.value);
+        jsonInput.value = JSON.stringify(obj);
+        renderJsonTree();
+      } catch (e) {
+        showError('JSON格式错误: ' + e.message);
+      }
+    });
+
+    // 美化JSON
+    beautifyBtn.addEventListener('click', () => {
+      try {
+        const obj = JSON.parse(jsonInput.value);
+        jsonInput.value = JSON.stringify(obj, null, 2);
+        renderJsonTree();
+      } catch (e) {
+        showError('JSON格式错误: ' + e.message);
+      }
+    });
+
+    // 转义JSON
+    escapeBtn.addEventListener('click', () => {
+      jsonInput.value = jsonInput.value
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      renderJsonTree();
+    });
+
+    // 去除转义
+    unescapeBtn.addEventListener('click', () => {
+      jsonInput.value = jsonInput.value
+        .replace(/\\\\/g, '\\')
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t');
+      renderJsonTree();
+    });
+
+    // 全部展开
+    expandAllBtn.addEventListener('click', () => {
+      toggleAll(true);
+    });
+
+    // 全部收起
+    collapseAllBtn.addEventListener('click', () => {
+      toggleAll(false);
+    });
+
+    // 渲染JSON树形结构
+    function renderJsonTree() {
+      const jsonString = jsonInput.value.trim();
+      if (!jsonString) {
+        jsonTree.innerHTML = '<div style="color:#7f8c8d;">请输入JSON数据</div>';
+        return;
+      }
+
+      try {
+        const obj = JSON.parse(jsonString);
+        jsonTree.innerHTML = '';
+        const treeElement = createTreeNode(obj, 'root');
+        jsonTree.appendChild(treeElement);
+        // 默认展开所有节点
+        toggleAll(true);
+      } catch (e) {
+        showError('JSON格式错误: ' + e.message);
+      }
+    }
+
+    // 创建树节点
+    function createTreeNode(data, keyName) {
+      const wrapper = document.createElement('div');
+
+      if (data !== null && typeof data === 'object') {
+        const isArray = Array.isArray(data);
+        const entries = isArray ? data.map((val, index) => [index, val]) : Object.entries(data);
+
+        const node = document.createElement('div');
+        node.className = 'collapsible expanded';
+
+        const line = document.createElement('div');
+        line.className = 'tree-line';
+
+        // 只有非空对象或数组才需要展开/收起按钮
+        if (entries.length > 0) {
+          const toggle = document.createElement('span');
+          toggle.className = 'tree-toggle';
+          toggle.innerHTML = '▶';
+          line.appendChild(toggle);
+        } else {
+          const placeholder = document.createElement('span');
+          placeholder.className = 'tree-toggle';
+          line.appendChild(placeholder);
+        }
+
+        const keySpan = document.createElement('span');
+        keySpan.className = 'json-key';
+        keySpan.textContent = (keyName !== 'root' ? keyName + ': ' : '') + (isArray ? '[' : '{');
+
+        line.appendChild(keySpan);
+
+        // 创建收起状态下的结束括号（与开始括号同行）
+        const collapsedBracket = document.createElement('span');
+        collapsedBracket.className = 'collapsed-bracket json-key';
+        collapsedBracket.textContent = isArray ? ']' : '}';
+
+        // 如果有内容，添加省略号
+        if (entries.length > 0) {
+          const ellipsis = document.createElement('span');
+          ellipsis.textContent = '... ';
+          line.appendChild(ellipsis);
+        }
+
+        line.appendChild(collapsedBracket);
+
+        const childrenWrapper = document.createElement('div');
+        childrenWrapper.className = 'tree-node';
+
+        if (entries.length > 0) {
+          entries.forEach(([key, value]) => {
+            const childNode = createTreeNode(
+              value,
+              isArray ? `[${key}]` : `"${key}"`
+            );
+            childrenWrapper.appendChild(childNode);
+          });
+
+          // 添加展开/收起功能
+          const toggle = line.querySelector('.tree-toggle');
+          if (toggle) {
+            toggle.addEventListener('click', (e) => {
+              e.stopPropagation();
+              node.classList.toggle('expanded');
+            });
+          }
+        } else {
+          const emptyPlaceholder = document.createElement('div');
+          emptyPlaceholder.className = 'tree-node empty-placeholder';
+          emptyPlaceholder.textContent = isArray ? '空数组' : '空对象';
+          childrenWrapper.appendChild(emptyPlaceholder);
+        }
+
+        const closingBracket = document.createElement('div');
+        closingBracket.className = 'tree-line expanded-bracket';
+        const closingSpan = document.createElement('span');
+        closingSpan.className = 'json-key';
+        closingSpan.textContent = isArray ? ']' : '}';
+        closingBracket.appendChild(closingSpan);
+
+        node.appendChild(line);
+        node.appendChild(childrenWrapper);
+        node.appendChild(closingBracket);
+
+        wrapper.appendChild(node);
+      } else {
+        const line = document.createElement('div');
+        line.className = 'tree-line';
+
+        // 添加占位符用于对齐
+        const placeholder = document.createElement('span');
+        placeholder.className = 'tree-toggle';
+        line.appendChild(placeholder);
+
+        const keySpan = document.createElement('span');
+        if (keyName !== 'root') {
+          keySpan.className = 'json-key';
+          keySpan.textContent = keyName + ': ';
+          line.appendChild(keySpan);
+        }
+
+        const valueSpan = document.createElement('span');
+        valueSpan.className = getValueClass(data);
+        valueSpan.textContent = formatValue(data);
+
+        line.appendChild(valueSpan);
+        wrapper.appendChild(line);
+      }
+
+      return wrapper;
+    }
+
+    // 获取值的CSS类名
+    function getValueClass(value) {
+      if (value === null) return 'json-null';
+      if (typeof value === 'string') return 'json-string';
+      if (typeof value === 'number') return 'json-number';
+      if (typeof value === 'boolean') return 'json-boolean';
+      return '';
+    }
+
+    // 格式化值显示
+    function formatValue(value) {
+      if (value === null) return 'null';
+      if (typeof value === 'string') return `"${value}"`;
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      return '';
+    }
+
+    // 展开或收起所有节点
+    function toggleAll(expand) {
+      const collapsibles = document.querySelectorAll('.collapsible');
+      collapsibles.forEach(node => {
+        node.classList.toggle('expanded', expand);
+      });
+    }
+
+    // 显示错误信息
+    function showError(message) {
+      jsonTree.innerHTML = `<div class="error-message">${message}</div>`;
+    }
+  </script>
+</body>
+
+</html>
