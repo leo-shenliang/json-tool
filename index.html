@@ -48,12 +48,19 @@
     .panel-content {
       flex: 1;
       padding: 10px;
-      overflow: auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .json-editor-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
     }
 
     textarea {
       width: 100%;
-      height: 99%;
+      height: 100%;
       border: 1px solid #ddd;
       border-radius: 4px;
       padding: 15px;
@@ -61,6 +68,7 @@
       font-size: 14px;
       resize: none;
       outline: none;
+      background-color: #f5f5f5;
     }
 
     .button-group {
@@ -93,31 +101,46 @@
       font-family: 'Consolas', 'Courier New', monospace;
       font-size: 14px;
       line-height: 1.5;
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      height: 100%;
+      overflow: auto;
     }
 
-    .json-key {
-      color: #922b21;
+    /* IDEA 配色方案 */
+    .json-property {
+      color: #067d17;
       font-weight: bold;
     }
 
     .json-string {
-      color: #2874a6;
+      color: #008000;
     }
 
     .json-number {
-      color: #239b56;
+      color: #1750b0;
     }
 
     .json-boolean {
-      color: #af7ac5;
+      color: #1750b0;
     }
 
     .json-null {
-      color: #7f8c8d;
+      color: #1750b0;
+    }
+
+    .json-bracket {
+      color: #000000;
+    }
+
+    .json-colon {
+      color: #000000;
     }
 
     .tree-node {
       margin-left: 20px;
+      position: relative;
     }
 
     .tree-toggle {
@@ -126,11 +149,14 @@
       margin-right: 5px;
       display: inline-block;
       width: 15px;
+      text-align: center;
+      color: #666;
     }
 
     .tree-line {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
+      min-height: 20px;
     }
 
     .collapsible>.tree-line>.tree-toggle {
@@ -162,7 +188,7 @@
     }
 
     .array-index {
-      color: #7f8c8d;
+      color: #666;
     }
 
     .error-message {
@@ -177,8 +203,66 @@
     }
 
     .empty-placeholder {
-      color: #7f8c8d;
+      color: #666;
       font-style: italic;
+    }
+
+    /* 连接线样式 */
+    .tree-node::before {
+      content: '';
+      position: absolute;
+      left: -15px;
+      top: 0;
+      width: 1px;
+      bottom: 10px;
+      background-color: #ccc;
+    }
+
+    .tree-node::after {
+      content: '';
+      position: absolute;
+      left: -15px;
+      top: 10px;
+      width: 10px;
+      height: 1px;
+      background-color: #ccc;
+    }
+
+    .last-node::before {
+      bottom: 10px;
+    }
+
+    /* 层级颜色 - IDEA风格 */
+    .level-0>.tree-line>.json-property {
+      color: #067d17;
+    }
+
+    .level-1>.tree-line>.json-property {
+      color: #784384;
+    }
+
+    .level-2>.tree-line>.json-property {
+      color: #b36900;
+    }
+
+    .level-3>.tree-line>.json-property {
+      color: #26468c;
+    }
+
+    .level-4>.tree-line>.json-property {
+      color: #067d17;
+    }
+
+    .level-5>.tree-line>.json-property {
+      color: #784384;
+    }
+
+    .level-6>.tree-line>.json-property {
+      color: #b36900;
+    }
+
+    .level-7>.tree-line>.json-property {
+      color: #26468c;
     }
   </style>
 </head>
@@ -197,7 +281,9 @@
         </div>
       </div>
       <div class="panel-content">
-        <textarea id="jsonInput" placeholder='请输入JSON字符串'></textarea>
+        <div class="json-editor-container">
+          <textarea id="jsonInput" placeholder='请输入JSON字符串'></textarea>
+        </div>
       </div>
     </div>
 
@@ -231,6 +317,28 @@
 
     // 初始化时渲染一次
     window.addEventListener('DOMContentLoaded', () => {
+      // 加载测试数据
+      jsonInput.value = `{
+  "busId": "30_0320250811103901140001",
+  "busLevel": "info",
+  "busName": "5752491e-891a-4091-ac39-cf5e22f98e24",
+  "data": {
+    "channelId": 3,
+    "message": "售后单等待退货",
+    "operateTime": "2025-08-11T11:08:43",
+    "operateType": "AFTERSALE_WAITING_RETURN_GOODS",
+    "operator": "liangyuping30",
+    "operatorType": "MERCHANT",
+    "orderId": "302054690320250811103901140001",
+    "outerOrderId": "0320250811103901140001",
+    "refOuterId": "8251338371679313920",
+    "shopId": "205469",
+    "splitCode": "01006"
+  },
+  "message": "开始",
+  "operatorType": "接收事件",
+  "serviceName": "订单服务_接收创建订单追踪消息"
+}`;
       renderJsonTree();
     });
 
@@ -295,14 +403,14 @@
     function renderJsonTree() {
       const jsonString = jsonInput.value.trim();
       if (!jsonString) {
-        jsonTree.innerHTML = '<div style="color:#7f8c8d;">请输入JSON数据</div>';
+        jsonTree.innerHTML = '<div style="color:#666;">请输入JSON数据</div>';
         return;
       }
 
       try {
         const obj = JSON.parse(jsonString);
         jsonTree.innerHTML = '';
-        const treeElement = createTreeNode(obj, 'root');
+        const treeElement = createTreeNode(obj, 'root', 0, true);
         jsonTree.appendChild(treeElement);
         // 默认展开所有节点
         toggleAll(true);
@@ -312,8 +420,9 @@
     }
 
     // 创建树节点
-    function createTreeNode(data, keyName) {
+    function createTreeNode(data, keyName, depth = 0, isRoot = false) {
       const wrapper = document.createElement('div');
+      wrapper.className = `level-${depth % 8}`;
 
       if (data !== null && typeof data === 'object') {
         const isArray = Array.isArray(data);
@@ -337,15 +446,26 @@
           line.appendChild(placeholder);
         }
 
-        const keySpan = document.createElement('span');
-        keySpan.className = 'json-key';
-        keySpan.textContent = (keyName !== 'root' ? keyName + ': ' : '') + (isArray ? '[' : '{');
+        if (keyName !== 'root') {
+          const keySpan = document.createElement('span');
+          keySpan.className = 'json-property';
+          keySpan.textContent = keyName;
+          line.appendChild(keySpan);
 
-        line.appendChild(keySpan);
+          const colonSpan = document.createElement('span');
+          colonSpan.className = 'json-colon';
+          colonSpan.textContent = ': ';
+          line.appendChild(colonSpan);
+        }
+
+        const bracketSpan = document.createElement('span');
+        bracketSpan.className = 'json-bracket';
+        bracketSpan.textContent = isArray ? '[' : '{';
+        line.appendChild(bracketSpan);
 
         // 创建收起状态下的结束括号（与开始括号同行）
         const collapsedBracket = document.createElement('span');
-        collapsedBracket.className = 'collapsed-bracket json-key';
+        collapsedBracket.className = 'collapsed-bracket json-bracket';
         collapsedBracket.textContent = isArray ? ']' : '}';
 
         // 如果有内容，添加省略号
@@ -361,11 +481,20 @@
         childrenWrapper.className = 'tree-node';
 
         if (entries.length > 0) {
-          entries.forEach(([key, value]) => {
+          entries.forEach(([key, value], index) => {
+            const isLast = index === entries.length - 1;
             const childNode = createTreeNode(
               value,
-              isArray ? `[${key}]` : `"${key}"`
+              isArray ? `[${key}]` : `"${key}"`,
+              depth + 1,
+              false
             );
+
+            // 标记最后一个子元素
+            if (isLast) {
+              childNode.classList.add('last-node');
+            }
+
             childrenWrapper.appendChild(childNode);
           });
 
@@ -387,7 +516,7 @@
         const closingBracket = document.createElement('div');
         closingBracket.className = 'tree-line expanded-bracket';
         const closingSpan = document.createElement('span');
-        closingSpan.className = 'json-key';
+        closingSpan.className = 'json-bracket';
         closingSpan.textContent = isArray ? ']' : '}';
         closingBracket.appendChild(closingSpan);
 
@@ -405,11 +534,16 @@
         placeholder.className = 'tree-toggle';
         line.appendChild(placeholder);
 
-        const keySpan = document.createElement('span');
         if (keyName !== 'root') {
-          keySpan.className = 'json-key';
-          keySpan.textContent = keyName + ': ';
+          const keySpan = document.createElement('span');
+          keySpan.className = 'json-property';
+          keySpan.textContent = keyName;
           line.appendChild(keySpan);
+
+          const colonSpan = document.createElement('span');
+          colonSpan.className = 'json-colon';
+          colonSpan.textContent = ': ';
+          line.appendChild(colonSpan);
         }
 
         const valueSpan = document.createElement('span');
